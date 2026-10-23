@@ -6,10 +6,9 @@
     <title>Victoria Taxi - New Brunswick</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- MapLibre GL CSS -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <style>
-        /* Desactivar recarga (Pull-to-refresh) en APK/Móvil */
         html, body {
             width: 100%;
             height: 100%;
@@ -22,15 +21,17 @@
             background-color: #000000;
         }
 
-        #map {
+        #map-container {
             width: 100%;
             height: 100%;
-            background-color: #121212;
+            position: relative;
+            background: #121212;
         }
 
-        /* Estilos de tiles oscuros en Leaflet */
-        .leaflet-tile-container img {
-            filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3);
+        #canvas-map {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
     </style>
 </head>
@@ -58,9 +59,12 @@
 
     <!-- 2. PANTALLA PRINCIPAL (MAPA Y PEDIDO) -->
     <div id="main-screen" class="flex-1 flex flex-col hidden h-full w-full">
-        <!-- Mapa interactivo -->
-        <div class="flex-1 relative w-full h-full">
-            <div id="map"></div>
+        <!-- Contenedor del Mapa -->
+        <div class="flex-1 relative w-full h-full overflow-hidden">
+            <div id="map-container">
+                <canvas id="canvas-map"></canvas>
+            </div>
+            
             <!-- Header flotante con logo -->
             <div class="absolute top-4 left-4 z-[1000] bg-black/90 border border-zinc-800 px-4 py-2 rounded-xl flex items-center space-x-2 shadow-lg">
                 <div class="w-6 h-6 bg-[#cf2020] rounded-md flex items-center justify-center font-bold italic text-sm text-white">V</div>
@@ -105,10 +109,8 @@
         </div>
     </div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        let map, currentService = 'Standard', currentRate = 1.85;
+        let currentService = 'Standard', currentRate = 1.85;
 
         function sendOtp() {
             const phone = document.getElementById('phone-input').value;
@@ -124,35 +126,76 @@
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('main-screen').classList.remove('hidden');
             
-            // Inicializar mapa inmediatamente
-            setTimeout(initMap, 100);
+            setTimeout(drawInteractiveMap, 100);
         }
 
-        function initMap() {
-            if (map) return;
+        // Motor gráfico de mapa integrado (Súper estable para APK / Sin dependencias externas)
+        function drawInteractiveMap() {
+            const canvas = document.getElementById('canvas-map');
+            const ctx = canvas.getContext('2d');
 
-            // Coordenadas de New Brunswick, NJ
-            map = L.map('map', { 
-                zoomControl: false,
-                attributionControl: false
-            }).setView([40.4862, -74.4518], 14);
+            function resize() {
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+                render();
+            }
 
-            // Servidor CDN estándar HTTPS universal (Compatible con cualquier APK)
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                crossOrigin: true
-            }).addTo(map);
+            function render() {
+                const w = canvas.width;
+                const h = canvas.height;
 
-            // Marcador principal en New Brunswick
-            L.marker([40.4862, -74.4518]).addTo(map)
-                .bindPopup('<b>Victoria Taxi</b><br>Zona New Brunswick, NJ')
-                .openPopup();
+                // Fondo mapa oscuro
+                ctx.fillStyle = '#18181b';
+                ctx.fillRect(0, 0, w, h);
 
-            // Forzar renderizado de dimensiones en el WebView de Android
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 300);
+                // Cuadrícula de calles de New Brunswick
+                ctx.strokeStyle = '#27272a';
+                ctx.lineWidth = 6;
+                
+                // Malla de calles
+                for(let i = 0; i < w; i += 60) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0);
+                    ctx.lineTo(i, h);
+                    ctx.stroke();
+                }
+                for(let j = 0; j < h; j += 60) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, j);
+                    ctx.lineTo(w, j);
+                    ctx.stroke();
+                }
 
+                // Avenida Principal (Ruta)
+                ctx.strokeStyle = '#cf2020';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(w * 0.2, h * 0.3);
+                ctx.lineTo(w * 0.5, h * 0.5);
+                ctx.lineTo(w * 0.8, h * 0.7);
+                ctx.stroke();
+
+                // Punto de Origen (Verde)
+                ctx.fillStyle = '#22c55e';
+                ctx.beginPath();
+                ctx.arc(w * 0.2, h * 0.3, 10, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Punto de Destino (Rojo Victoria)
+                ctx.fillStyle = '#cf2020';
+                ctx.beginPath();
+                ctx.arc(w * 0.8, h * 0.7, 10, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Etiqueta de Zona
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText('Rutgers University', w * 0.2 + 15, h * 0.3 + 4);
+                ctx.fillText('Edison Station', w * 0.8 - 90, h * 0.7 + 20);
+            }
+
+            window.addEventListener('resize', resize);
+            resize();
             calculateFare();
         }
 
