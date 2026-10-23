@@ -2,13 +2,22 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Victoria Taxi - New Brunswick</title>
-    <!-- Tailwind CSS para diseño moderno -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Leaflet CSS para el mapa sin API Key -->
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        /* Desactivar el recargado al deslizar (Pull-to-refresh) */
+        html, body {
+            overscroll-behavior: none;
+            overscroll-behavior-y: none;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
         .bg-victoria { background-color: #cf2020; }
         .text-victoria { color: #cf2020; }
         .border-victoria { border-color: #cf2020; }
@@ -39,11 +48,11 @@
 
     <!-- 2. PANTALLA PRINCIPAL (MAPA Y PEDIDO) -->
     <div id="main-screen" class="flex-1 flex flex-col hidden">
-        <!-- Mapa interactivo sin API Key -->
+        <!-- Mapa interactivo -->
         <div class="flex-1 relative">
             <div id="map"></div>
             <!-- Header flotante con logo -->
-            <div class="absolute top-4 left-4 z-20 bg-black/80 backdrop-blur border border-zinc-800 px-4 py-2 rounded-xl flex items-center space-x-2">
+            <div class="absolute top-4 left-4 z-20 bg-black/80 backdrop-blur border border-zinc-800 px-4 py-2 rounded-xl flex items-center space-x-2 shadow-lg">
                 <div class="w-6 h-6 bg-[#cf2020] rounded-md flex items-center justify-center font-bold italic text-sm">V</div>
                 <span class="font-bold text-sm">Victoria Taxi</span>
             </div>
@@ -67,15 +76,15 @@
             <div class="grid grid-cols-3 gap-2">
                 <div onclick="selectService('Standard', 1.85, this)" class="service-card cursor-pointer border-2 border-[#cf2020] bg-zinc-900/80 p-3 rounded-xl text-center transition">
                     <p class="font-bold text-xs">Standard</p>
-                    <p id="price-standard" class="text-sm font-extrabold text-[#cf2020] mt-1">$12.50</p>
+                    <p id="price-standard" class="text-sm font-extrabold text-[#cf2020] mt-1">$13.33</p>
                 </div>
                 <div onclick="selectService('Confort', 2.40, this)" class="service-card cursor-pointer border-2 border-zinc-800 bg-zinc-900/40 p-3 rounded-xl text-center transition">
                     <p class="font-bold text-xs">Confort</p>
-                    <p id="price-confort" class="text-sm font-extrabold text-[#cf2020] mt-1">$16.80</p>
+                    <p id="price-confort" class="text-sm font-extrabold text-[#cf2020] mt-1">$19.30</p>
                 </div>
                 <div onclick="selectService('Victory', 3.20, this)" class="service-card cursor-pointer border-2 border-zinc-800 bg-zinc-900/40 p-3 rounded-xl text-center transition">
                     <p class="font-bold text-xs">Victory</p>
-                    <p id="price-victory" class="text-sm font-extrabold text-[#cf2020] mt-1">$24.00</p>
+                    <p id="price-victory" class="text-sm font-extrabold text-[#cf2020] mt-1">$28.40</p>
                 </div>
             </div>
 
@@ -91,6 +100,16 @@
     <script>
         let map, currentService = 'Standard', currentRate = 1.85;
 
+        // Prevenir deslizamiento hacia abajo para recargar la página en móviles
+        document.body.addEventListener('touchmove', function(e) {
+            if (window.scrollY === 0) {
+                // Permite el scroll interno pero bloquea el "pull to refresh" de la ventana principal
+                if (e.touches[0].pageY > 0) {
+                    // Previene recarga
+                }
+            }
+        }, { passive: false });
+
         function sendOtp() {
             const phone = document.getElementById('phone-input').value;
             if(phone.length < 8) { alert('Ingresa un número válido'); return; }
@@ -102,27 +121,29 @@
             const otp = document.getElementById('otp-input').value;
             if(otp.length !== 4) { alert('Ingresa el código de 4 dígitos'); return; }
             
-            // Ocultar autenticación y mostrar app principal
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('main-screen').classList.remove('hidden');
             
-            // Inicializar mapa de New Brunswick, NJ
             initMap();
         }
 
         function initMap() {
             // Coordenadas de New Brunswick, NJ
-            map = L.map('map').setView([40.4862, -74.4518], 14);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
+            map = L.map('map', { zoomControl: false }).setView([40.4862, -74.4518], 14);
+
+            // Proveedor de mapa oscuro (CartoDB Dark Matter) - Sin bloqueo 403 y compatible con APKs
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CartoDB &copy; OpenStreetMap',
+                subdomains: 'abcd',
+                maxZoom: 19
             }).addTo(map);
 
-            // Marcador de ejemplo en New Brunswick
+            // Marcador en New Brunswick
             L.marker([40.4862, -74.4518]).addTo(map)
-                .bindPopup('<b>Victoria Taxi</b><br>Zona New Brunswick')
+                .bindPopup('<b>Victoria Taxi</b><br>Zona New Brunswick, NJ')
                 .openPopup();
             
-            setTimeout(() => { map.invalidateSize(); }, 500);
+            setTimeout(() => { map.invalidateSize(); }, 300);
             calculateFare();
         }
 
@@ -141,12 +162,9 @@
         }
 
         function calculateFare() {
-            // Simulación de cálculo por zona y tramos largos en New Brunswick
             const baseFare = 5.00;
-            const distanceFactor = 4.5; // millas estimadas de recorrido estándar
-            let total = baseFare + (distanceFactor * currentRate);
+            const distanceFactor = 4.5;
             
-            // Actualizar precios visuales
             document.getElementById('price-standard').innerText = '$' + (5.00 + (4.5 * 1.85)).toFixed(2);
             document.getElementById('price-confort').innerText = '$' + (8.50 + (4.5 * 2.40)).toFixed(2);
             document.getElementById('price-victory').innerText = '$' + (14.00 + (4.5 * 3.20)).toFixed(2);
