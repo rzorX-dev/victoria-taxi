@@ -3,834 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Victoria Taxi - New Brunswick, NJ</title>
-    
-    <!-- Tailwind CSS -->
+    <title>Victoria Taxi - New Brunswick</title>
+    <!-- Tailwind CSS para diseño moderno -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            DEFAULT: '#cf2020',
-                            dark: '#800d0d',
-                            medium: '#b31b1b',
-                            light: '#e63939',
-                            soft: '#fdf2f2',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- Leaflet CSS & JS for Interactive Map -->
+    <!-- Leaflet CSS para el mapa sin API Key -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- Custom Styling -->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-        
-        * {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #111;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cf2020;
-            border-radius: 3px;
-        }
-
-        .leaflet-container {
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
-
-        /* Hide Leaflet Attribution for cleaner mobile UI */
-        .leaflet-control-attribution {
-            display: none !important;
-        }
-
-        /* Animated pulse ring for driver search */
-        @keyframes radar-pulse {
-            0% {
-                transform: scale(0.95);
-                box-shadow: 0 0 0 0 rgba(207, 32, 32, 0.7);
-            }
-            70% {
-                transform: scale(1.15);
-                box-shadow: 0 0 0 25px rgba(207, 32, 32, 0);
-            }
-            100% {
-                transform: scale(0.95);
-                box-shadow: 0 0 0 0 rgba(207, 32, 32, 0);
-            }
-        }
-
-        .radar-animated {
-            animation: radar-pulse 2s infinite;
-        }
-
-        /* Smooth slide-up transition */
-        .slide-up-enter {
-            transform: translateY(100%);
-            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .slide-up-active {
-            transform: translateY(0);
-        }
-
-        /* Custom Map Marker styles */
-        .car-marker-icon {
-            transition: all 0.5s ease;
-        }
+        .bg-victoria { background-color: #cf2020; }
+        .text-victoria { color: #cf2020; }
+        .border-victoria { border-color: #cf2020; }
+        #map { height: 100%; width: 100%; z-index: 10; }
     </style>
 </head>
-<body class="bg-black text-white min-h-screen flex items-center justify-center p-0 md:p-4">
+<body class="bg-black text-white h-screen flex flex-col overflow-hidden">
 
-    <!-- Main Container / Phone Mockup Wrapper -->
-    <div class="w-full max-w-md h-screen md:h-[880px] bg-black md:rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col border border-zinc-800">
-        
-        <!-- Top Status Bar (Mobile Style) -->
-        <div class="bg-black text-white px-6 pt-3 pb-2 flex justify-between items-center text-xs z-30 select-none border-b border-zinc-900">
-            <span class="font-semibold" id="clock">12:00</span>
-            <div class="flex items-center space-x-2">
-                <i class="fa-solid fa-signal"></i>
-                <i class="fa-solid fa-wifi"></i>
-                <i class="fa-solid fa-battery-full text-brand"></i>
-            </div>
+    <!-- 1. PANTALLA DE REGISTRO / AUTENTICACIÓN -->
+    <div id="auth-screen" class="fixed inset-0 bg-black z-50 flex flex-col justify-center items-center p-6">
+        <div class="w-24 h-24 bg-gradient-to-b from-[#cf2020] to-[#800000] rounded-2xl flex items-center justify-center shadow-lg shadow-red-900/50 mb-6">
+            <span class="text-white text-5xl font-black italic">V</span>
+        </div>
+        <h1 class="text-2xl font-bold mb-2">Victoria Taxi</h1>
+        <p class="text-gray-400 text-sm mb-6 text-center">New Brunswick, NJ</p>
+
+        <div id="step-phone" class="w-full max-w-sm space-y-4">
+            <input type="tel" id="phone-input" placeholder="Número de teléfono (+1...)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-[#cf2020] outline-none">
+            <button onclick="sendOtp()" class="w-full bg-[#cf2020] hover:bg-red-700 font-bold py-3 rounded-xl transition">Enviar Código SMS</button>
         </div>
 
-        <!-- APP HEADER / BRAND BAR -->
-        <header class="bg-zinc-950 px-5 py-3 flex items-center justify-between border-b border-zinc-800/80 z-20">
-            <div class="flex items-center space-x-3">
-                <!-- Victoria Logo SVG Rendered directly -->
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-medium to-brand overflow-hidden shadow-lg shadow-brand/20 flex items-center justify-center p-1.5 flex-shrink-0">
-                    <svg viewBox="0 0 100 100" class="w-full h-full">
-                        <defs>
-                            <linearGradient id="vGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#ffffff"/>
-                                <stop offset="100%" stop-color="#f0f0f0"/>
-                            </linearGradient>
-                        </defs>
-                        <rect width="100" height="100" rx="20" fill="transparent" />
-                        <path d="M 22 21 L 41 77 L 59 77 L 78 21 L 65 21 L 56 52 C 55 55 53 62 50 71 C 47 62 45 55 44 52 L 35 21 Z" fill="#FFFFFF"/>
-                        <path d="M 58 28 C 65 35 69 48 59 75 L 78 21 L 65 21 Z" fill="rgba(207,32,32,0.3)"/>
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="text-lg font-extrabold tracking-tight text-white leading-none">VICTORIA <span class="text-brand">TAXI</span></h1>
-                    <p class="text-[10px] text-zinc-400 font-medium tracking-wide uppercase mt-0.5"><i class="fa-solid fa-location-dot text-brand mr-1"></i>New Brunswick, NJ</p>
-                </div>
-            </div>
-
-            <!-- Profile / Active User Badge -->
-            <div id="userBadge" class="hidden">
-                <button onclick="openProfileModal()" class="w-9 h-9 rounded-full bg-zinc-800 border border-brand/50 flex items-center justify-center text-xs font-bold text-white hover:border-brand transition">
-                    <i class="fa-solid fa-user text-brand"></i>
-                </button>
-            </div>
-        </header>
-
-        <!-- VIEW 1: AUTHENTICATION / PHONE LOGIN SCREEN -->
-        <section id="viewAuth" class="flex-1 flex flex-col justify-between p-6 bg-gradient-to-b from-zinc-950 via-zinc-900 to-black z-20">
-            <div class="mt-4">
-                <div class="w-20 h-20 bg-brand rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand/30">
-                    <svg viewBox="0 0 100 100" class="w-14 h-14">
-                        <path d="M 22 21 L 41 77 L 59 77 L 78 21 L 65 21 L 56 52 C 55 55 53 62 50 71 C 47 62 45 55 44 52 L 35 21 Z" fill="#FFFFFF"/>
-                    </svg>
-                </div>
-                <h2 class="text-2xl font-bold text-center text-white mb-2">Bienvenido a Victoria Taxi</h2>
-                <p class="text-xs text-zinc-400 text-center mb-8 px-4">Tu transporte rápido, seguro y confiable en New Brunswick, NJ y zonas adyacentes.</p>
-
-                <!-- Phone Step -->
-                <div id="stepPhone" class="space-y-4">
-                    <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">Número de Teléfono (USA)</label>
-                    <div class="flex items-center bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden focus-within:border-brand transition">
-                        <div class="bg-zinc-800 px-3 py-3.5 text-sm font-semibold text-zinc-300 flex items-center gap-1.5 border-r border-zinc-700">
-                            <span>🇺🇸</span>
-                            <span>+1</span>
-                        </div>
-                        <input type="tel" id="inputPhone" placeholder="(732) 555-0199" maxlength="14" class="w-full bg-transparent px-3 py-3 text-white focus:outline-none text-sm tracking-wide">
-                    </div>
-
-                    <button onclick="sendOTP()" class="w-full bg-brand hover:bg-brand-medium text-white font-bold py-3.5 rounded-xl shadow-lg shadow-brand/30 transition duration-200 active:scale-[0.98] text-sm uppercase tracking-wide">
-                        Enviar Código de Confirmación
-                    </button>
-
-                    <!-- Quick Demo Fill Button -->
-                    <button onclick="quickLoginDemo()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium py-2.5 rounded-xl text-xs transition border border-zinc-700 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-bolt text-amber-400"></i> Entrar Rápido (Modo Demo)
-                    </button>
-                </div>
-
-                <!-- OTP Step (Initially Hidden) -->
-                <div id="stepOTP" class="hidden space-y-4">
-                    <div class="bg-brand/10 border border-brand/30 p-3 rounded-xl mb-2 text-center">
-                        <p class="text-xs text-zinc-300">Código SMS enviado al <span id="displayPhone" class="font-bold text-white"></span></p>
-                        <p class="text-[11px] text-brand mt-0.5 font-mono">Código de prueba: <span class="font-bold underline">1234</span></p>
-                    </div>
-
-                    <div class="flex justify-center space-x-2 my-4">
-                        <input type="text" maxlength="1" class="otp-input w-12 h-12 bg-zinc-900 border border-zinc-700 text-center text-xl font-bold rounded-xl text-white focus:border-brand focus:outline-none">
-                        <input type="text" maxlength="1" class="otp-input w-12 h-12 bg-zinc-900 border border-zinc-700 text-center text-xl font-bold rounded-xl text-white focus:border-brand focus:outline-none">
-                        <input type="text" maxlength="1" class="otp-input w-12 h-12 bg-zinc-900 border border-zinc-700 text-center text-xl font-bold rounded-xl text-white focus:border-brand focus:outline-none">
-                        <input type="text" maxlength="1" class="otp-input w-12 h-12 bg-zinc-900 border border-zinc-700 text-center text-xl font-bold rounded-xl text-white focus:border-brand focus:outline-none">
-                    </div>
-
-                    <button onclick="verifyOTP()" class="w-full bg-brand hover:bg-brand-medium text-white font-bold py-3.5 rounded-xl shadow-lg shadow-brand/30 transition text-sm uppercase tracking-wide">
-                        Confirmar y Continuar
-                    </button>
-
-                    <button onclick="backToPhone()" class="w-full text-zinc-400 hover:text-white text-xs py-2">
-                        <i class="fa-solid fa-arrow-left mr-1"></i> Cambiar número de teléfono
-                    </button>
-                </div>
-            </div>
-
-            <p class="text-[11px] text-zinc-500 text-center">
-                Al continuar, aceptas nuestros Términos de Servicio en New Brunswick, NJ.
-            </p>
-        </section>
-
-        <!-- MAIN INTERACTIVE BOOKING VIEW (MAP + PANELS) -->
-        <main id="viewBooking" class="hidden flex-1 relative overflow-hidden flex flex-col">
-            
-            <!-- LEAFLET MAP CONTAINER -->
-            <div id="map" class="w-full h-full absolute inset-0 z-0"></div>
-
-            <!-- Floating Top Control Overlay -->
-            <div class="absolute top-3 left-3 right-3 z-10 flex gap-2">
-                <button onclick="recenterMap()" class="bg-black/80 backdrop-blur-md text-white p-2.5 rounded-xl border border-zinc-700 shadow-lg hover:bg-black transition text-xs font-semibold flex items-center gap-1.5">
-                    <i class="fa-solid fa-crosshairs text-brand"></i> Mi Ubicación
-                </button>
-                <div class="bg-black/80 backdrop-blur-md text-zinc-300 px-3 py-2.5 rounded-xl border border-zinc-700 shadow-lg text-xs font-medium flex-1 flex items-center justify-between">
-                    <span><i class="fa-solid fa-circle text-[8px] text-emerald-500 mr-1.5 animate-pulse"></i> New Brunswick, NJ</span>
-                    <span class="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-md border border-zinc-700" id="zoneBadge">Zona Local</span>
-                </div>
-            </div>
-
-            <!-- BOTTOM SLIDING BOOKING PANEL -->
-            <div class="mt-auto z-10 bg-zinc-950/95 backdrop-blur-lg border-t border-zinc-800/80 rounded-t-3xl p-4 shadow-2xl flex flex-col max-h-[85%] overflow-y-auto">
-                <div class="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-3"></div>
-
-                <!-- STATE 1: ROUTE & LOCATION SELECTOR -->
-                <div id="panelRouteSelect" class="space-y-3">
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center justify-between">
-                        <span>¿A dónde vamos hoy?</span>
-                        <span class="text-[11px] font-normal text-zinc-400">Rutgers & Tri-State</span>
-                    </h3>
-
-                    <!-- Pickup Input -->
-                    <div class="relative flex items-center">
-                        <div class="absolute left-3 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20"></div>
-                        <select id="selectOrigin" onchange="updateTripCalculation()" class="w-full bg-zinc-900 border border-zinc-800 text-white text-xs rounded-xl pl-9 pr-8 py-3 appearance-none focus:outline-none focus:border-brand">
-                            <!-- Populated dynamically via JS -->
-                        </select>
-                        <i class="fa-solid fa-chevron-down absolute right-3 text-xs text-zinc-500 pointer-events-none"></i>
-                    </div>
-
-                    <!-- Destination Input -->
-                    <div class="relative flex items-center">
-                        <div class="absolute left-3 w-3 h-3 rounded-full bg-brand ring-4 ring-brand/20"></div>
-                        <select id="selectDestination" onchange="updateTripCalculation()" class="w-full bg-zinc-900 border border-zinc-800 text-white text-xs rounded-xl pl-9 pr-8 py-3 appearance-none focus:outline-none focus:border-brand">
-                            <!-- Populated dynamically via JS -->
-                        </select>
-                        <i class="fa-solid fa-chevron-down absolute right-3 text-xs text-zinc-500 pointer-events-none"></i>
-                    </div>
-
-                    <!-- Trip Info Pill (Distance & Est Duration) -->
-                    <div id="tripStatsPill" class="flex justify-between items-center bg-zinc-900/80 border border-zinc-800 px-3 py-2 rounded-lg text-xs">
-                        <div class="flex items-center gap-2 text-zinc-300">
-                            <i class="fa-solid fa-route text-brand"></i>
-                            <span id="tripDistance">3.2 miles</span>
-                        </div>
-                        <div class="flex items-center gap-2 text-zinc-300">
-                            <i class="fa-regular fa-clock text-brand"></i>
-                            <span id="tripDuration">10 mins</span>
-                        </div>
-                        <div class="text-[10px] text-zinc-400 font-semibold px-2 py-0.5 bg-zinc-800 rounded" id="fareTypeLabel">
-                            Tarifa por Zona
-                        </div>
-                    </div>
-
-                    <!-- SERVICE TIER CARDS -->
-                    <div class="space-y-2 pt-1">
-                        <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Servicios Victoria</p>
-                        
-                        <!-- Standard Option -->
-                        <div onclick="selectTier('standard')" id="tier-standard" class="tier-card p-3 rounded-2xl bg-zinc-900 border-2 border-brand cursor-pointer transition flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-12 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-xl text-zinc-200">
-                                    <i class="fa-solid fa-car"></i>
-                                </div>
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <h4 class="font-bold text-sm text-white">Standard</h4>
-                                        <span class="text-[9px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono">4 plazas</span>
-                                    </div>
-                                    <p class="text-[11px] text-zinc-400">Viajes rápidos y económicos</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="font-black text-base text-white" id="price-standard">$12.50</div>
-                                <div class="text-[10px] text-emerald-400">Llega en 3 min</div>
-                            </div>
-                        </div>
-
-                        <!-- Confort Option -->
-                        <div onclick="selectTier('confort')" id="tier-confort" class="tier-card p-3 rounded-2xl bg-zinc-900 border-2 border-transparent hover:border-zinc-700 cursor-pointer transition flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-12 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-xl text-amber-400">
-                                    <i class="fa-solid fa-car-side"></i>
-                                </div>
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <h4 class="font-bold text-sm text-white">Confort</h4>
-                                        <span class="text-[9px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono">Autos Sedán</span>
-                                    </div>
-                                    <p class="text-[11px] text-zinc-400">Más espacio y vehículos nuevos</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="font-black text-base text-white" id="price-confort">$17.00</div>
-                                <div class="text-[10px] text-emerald-400">Llega en 5 min</div>
-                            </div>
-                        </div>
-
-                        <!-- Victory Option -->
-                        <div onclick="selectTier('victory')" id="tier-victory" class="tier-card p-3 rounded-2xl bg-zinc-900 border-2 border-transparent hover:border-zinc-700 cursor-pointer transition flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-12 h-10 bg-gradient-to-br from-brand-medium to-brand rounded-xl flex items-center justify-center text-xl text-white shadow-md shadow-brand/30">
-                                    <i class="fa-solid fa-crown"></i>
-                                </div>
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <h4 class="font-bold text-sm text-white">Victory VIP</h4>
-                                        <span class="text-[9px] bg-brand/30 text-brand-light px-1.5 py-0.5 rounded font-mono font-bold">Lujo</span>
-                                    </div>
-                                    <p class="text-[11px] text-zinc-400">SUVs de alta gama & servicio Premium</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="font-black text-base text-white" id="price-victory">$26.00</div>
-                                <div class="text-[10px] text-emerald-400">Llega en 4 min</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Payment & Confirm Button -->
-                    <div class="pt-2">
-                        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2 px-1">
-                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-money-bill-wave text-emerald-400"></i> Pago: Efectivo / Zelle</span>
-                            <button class="text-brand font-semibold text-[11px] hover:underline" onclick="togglePaymentMethod()">Cambiar</button>
-                        </div>
-                        <button onclick="requestRide()" class="w-full bg-brand hover:bg-brand-medium text-white font-black py-3.5 rounded-xl shadow-lg shadow-brand/40 uppercase tracking-wider text-sm transition active:scale-[0.98] flex items-center justify-center gap-2">
-                            <span>Pedir Victoria Taxi</span>
-                            <i class="fa-solid fa-chevron-right text-xs"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- STATE 2: SEARCHING FOR DRIVER ANIMATION -->
-                <div id="panelSearching" class="hidden py-8 text-center space-y-5">
-                    <div class="relative w-24 h-24 mx-auto flex items-center justify-center">
-                        <div class="absolute inset-0 rounded-full border-4 border-brand radar-animated"></div>
-                        <div class="w-16 h-16 bg-brand rounded-full flex items-center justify-center text-2xl text-white shadow-xl">
-                            <i class="fa-solid fa-taxi animate-bounce"></i>
-                        </div>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-extrabold text-white">Buscando un conductor cerca...</h3>
-                        <p class="text-xs text-zinc-400 mt-1">Conectando con taxistas disponibles en New Brunswick</p>
-                    </div>
-                    <div class="w-full bg-zinc-900 rounded-full h-2 overflow-hidden border border-zinc-800">
-                        <div class="bg-brand h-full w-2/3 animate-pulse"></div>
-                    </div>
-                    <button onclick="cancelSearch()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold py-2.5 px-6 rounded-xl border border-zinc-700 transition">
-                        Cancelar Solicitud
-                    </button>
-                </div>
-
-                <!-- STATE 3: DRIVER ASSIGNED & TRACKING -->
-                <div id="panelTracking" class="hidden space-y-4">
-                    <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
-                        <div class="flex items-center space-x-3">
-                            <div class="relative">
-                                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" class="w-12 h-12 rounded-full object-cover border-2 border-brand" alt="Driver">
-                                <span class="absolute -bottom-1 -right-1 bg-emerald-500 w-3.5 h-3.5 rounded-full border-2 border-zinc-950"></span>
-                            </div>
-                            <div>
-                                <h4 class="font-bold text-sm text-white" id="driverName">Carlos Mendoza</h4>
-                                <div class="flex items-center gap-1.5 text-xs text-zinc-400">
-                                    <span class="text-amber-400"><i class="fa-solid fa-star"></i> 4.95</span>
-                                    <span>•</span>
-                                    <span id="driverCar">Toyota Camry Red</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <span class="bg-brand/20 text-brand-light border border-brand/40 px-2.5 py-1 rounded-lg font-mono font-bold text-xs" id="licensePlate">
-                                NJ-V789
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- ETA Progress Banner -->
-                    <div class="bg-gradient-to-r from-zinc-900 to-zinc-900/90 border border-zinc-800 p-3 rounded-xl flex items-center justify-between">
-                        <div>
-                            <p class="text-[11px] text-zinc-400 uppercase font-semibold">Tiempo Estimado de Llegada</p>
-                            <p class="text-xl font-black text-white" id="etaCountdown">3 Minutos</p>
-                        </div>
-                        <div class="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg">
-                            <i class="fa-solid fa-location-arrow animate-pulse"></i>
-                        </div>
-                    </div>
-
-                    <!-- Actions Bar -->
-                    <div class="grid grid-cols-3 gap-2">
-                        <button onclick="simCallDriver()" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-phone text-emerald-400"></i> Llamar
-                        </button>
-                        <button onclick="simMessageDriver()" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-comment text-brand"></i> Mensaje
-                        </button>
-                        <button onclick="cancelActiveRide()" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-red-400 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-xmark"></i> Cancelar
-                        </button>
-                    </div>
-                </div>
-
-            </div>
-        </main>
-
-        <!-- USER PROFILE / SETTINGS MODAL -->
-        <div id="profileModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-end md:items-center justify-center p-0 md:p-4">
-            <div class="bg-zinc-950 w-full max-w-sm rounded-t-3xl md:rounded-2xl border border-zinc-800 p-6 space-y-4 shadow-2xl">
-                <div class="flex justify-between items-center border-b border-zinc-800 pb-3">
-                    <h3 class="font-bold text-white text-base">Mi Cuenta Victoria</h3>
-                    <button onclick="closeProfileModal()" class="text-zinc-400 hover:text-white p-1">
-                        <i class="fa-solid fa-xmark text-lg"></i>
-                    </button>
-                </div>
-                
-                <div class="space-y-3 text-xs">
-                    <div class="flex justify-between items-center py-2 border-b border-zinc-900">
-                        <span class="text-zinc-400">Teléfono Registrado</span>
-                        <span id="profilePhone" class="font-mono text-white">+1 (732) 555-0199</span>
-                    </div>
-                    <div class="flex justify-between items-center py-2 border-b border-zinc-900">
-                        <span class="text-zinc-400">Zona Preferida</span>
-                        <span class="text-white">New Brunswick & Highland Park</span>
-                    </div>
-                    <div class="flex justify-between items-center py-2 border-b border-zinc-900">
-                        <span class="text-zinc-400">Viajes Realizados</span>
-                        <span class="text-brand font-bold">14 viajes</span>
-                    </div>
-                </div>
-
-                <button onclick="logout()" class="w-full bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 font-bold py-2.5 rounded-xl text-xs transition mt-2">
-                    Cerrar Sesión
-                </button>
-            </div>
+        <div id="step-otp" class="w-full max-w-sm space-y-4 hidden">
+            <p class="text-xs text-gray-400 text-center">Ingresa el código de 4 dígitos enviado a tu celular</p>
+            <input type="text" id="otp-input" placeholder="Ej: 1234" maxlength="4" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white text-center tracking-widest text-xl focus:border-[#cf2020] outline-none">
+            <button onclick="verifyOtp()" class="w-full bg-[#cf2020] hover:bg-red-700 font-bold py-3 rounded-xl transition">Confirmar e Ingresar</button>
         </div>
-
-        <!-- NOTIFICATION TOAST -->
-        <div id="toast" class="absolute top-14 left-4 right-4 bg-zinc-900 border border-brand text-white text-xs px-4 py-3 rounded-xl shadow-2xl z-50 transform -translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 pointer-events-none">
-            <i class="fa-solid fa-circle-info text-brand text-base"></i>
-            <span id="toastMsg">Mensaje de notificación</span>
-        </div>
-
     </div>
 
-    <!-- JAVASCRIPT APP LOGIC -->
+    <!-- 2. PANTALLA PRINCIPAL (MAPA Y PEDIDO) -->
+    <div id="main-screen" class="flex-1 flex flex-col hidden">
+        <!-- Mapa interactivo sin API Key -->
+        <div class="flex-1 relative">
+            <div id="map"></div>
+            <!-- Header flotante con logo -->
+            <div class="absolute top-4 left-4 z-20 bg-black/80 backdrop-blur border border-zinc-800 px-4 py-2 rounded-xl flex items-center space-x-2">
+                <div class="w-6 h-6 bg-[#cf2020] rounded-md flex items-center justify-center font-bold italic text-sm">V</div>
+                <span class="font-bold text-sm">Victoria Taxi</span>
+            </div>
+        </div>
+
+        <!-- Panel Inferior de Cotización -->
+        <div class="bg-zinc-950 border-t border-zinc-800 p-5 rounded-t-3xl shadow-2xl z-20 space-y-4">
+            <!-- Direcciones -->
+            <div class="space-y-2">
+                <div class="flex items-center space-x-3 bg-zinc-900 p-3 rounded-xl border border-zinc-800">
+                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <input type="text" id="origin" value="Rutgers University, New Brunswick, NJ" class="bg-transparent text-sm w-full outline-none text-white">
+                </div>
+                <div class="flex items-center space-x-3 bg-zinc-900 p-3 rounded-xl border border-zinc-800">
+                    <div class="w-3 h-3 bg-[#cf2020] rounded-full"></div>
+                    <input type="text" id="destination" value="Edison Station, NJ" class="bg-transparent text-sm w-full outline-none text-white" oninput="calculateFare()">
+                </div>
+            </div>
+
+            <!-- Opciones de Servicio -->
+            <div class="grid grid-cols-3 gap-2">
+                <div onclick="selectService('Standard', 1.85, this)" class="service-card cursor-pointer border-2 border-[#cf2020] bg-zinc-900/80 p-3 rounded-xl text-center transition">
+                    <p class="font-bold text-xs">Standard</p>
+                    <p id="price-standard" class="text-sm font-extrabold text-[#cf2020] mt-1">$12.50</p>
+                </div>
+                <div onclick="selectService('Confort', 2.40, this)" class="service-card cursor-pointer border-2 border-zinc-800 bg-zinc-900/40 p-3 rounded-xl text-center transition">
+                    <p class="font-bold text-xs">Confort</p>
+                    <p id="price-confort" class="text-sm font-extrabold text-[#cf2020] mt-1">$16.80</p>
+                </div>
+                <div onclick="selectService('Victory', 3.20, this)" class="service-card cursor-pointer border-2 border-zinc-800 bg-zinc-900/40 p-3 rounded-xl text-center transition">
+                    <p class="font-bold text-xs">Victory</p>
+                    <p id="price-victory" class="text-sm font-extrabold text-[#cf2020] mt-1">$24.00</p>
+                </div>
+            </div>
+
+            <!-- Botón de Pedido -->
+            <button onclick="requestTaxi()" class="w-full bg-[#cf2020] hover:bg-red-700 font-bold py-3.5 rounded-xl transition shadow-lg shadow-red-900/30">
+                Pedir <span id="selected-service-name">Standard</span> Taxi
+            </button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // --- NEW BRUNSWICK, NJ LOCATIONS DATABASE ---
-        const LOCATIONS = [
-            // Local New Brunswick / Rutgers Area
-            { id: 'nb_train', name: 'New Brunswick Train Station (NJ Transit)', lat: 40.4962, lng: -74.4452, zone: 'local' },
-            { id: 'rutgers_college_ave', name: 'Rutgers Student Center (College Ave)', lat: 40.5026, lng: -74.4517, zone: 'local' },
-            { id: 'rwj_hospital', name: 'Robert Wood Johnson Hosp. (RWJ)', lat: 40.4935, lng: -74.4485, zone: 'local' },
-            { id: 'jersey_ave', name: 'Jersey Ave Station / Industrial Park', lat: 40.4735, lng: -74.4750, zone: 'local' },
-            { id: 'highland_park', name: 'Raritan Ave (Highland Park Center)', lat: 40.4988, lng: -74.4320, zone: 'local' },
-            { id: 'piscataway_busch', name: 'Rutgers Busch Campus (Piscataway)', lat: 40.5230, lng: -74.4580, zone: 'local' },
+        let map, currentService = 'Standard', currentRate = 1.85;
+
+        function sendOtp() {
+            const phone = document.getElementById('phone-input').value;
+            if(phone.length < 8) { alert('Ingresa un número válido'); return; }
+            document.getElementById('step-phone').classList.add('hidden');
+            document.getElementById('step-otp').classList.remove('hidden');
+        }
+
+        function verifyOtp() {
+            const otp = document.getElementById('otp-input').value;
+            if(otp.length !== 4) { alert('Ingresa el código de 4 dígitos'); return; }
             
-            // Long Distance Trips (Tramos Largos)
-            { id: 'ewr_airport', name: 'Aeropuerto Newark Liberty (EWR)', lat: 40.6895, lng: -74.1745, zone: 'long' },
-            { id: 'nyc_midtown', name: 'Nueva York (Midtown Manhattan, NYC)', lat: 40.7549, lng: -73.9840, zone: 'long' },
-            { id: 'princeton_jct', name: 'Princeton Junction Station', lat: 40.3150, lng: -74.6250, zone: 'long' },
-            { id: 'jfk_airport', name: 'Aeropuerto JFK (New York)', lat: 40.6413, lng: -73.7781, zone: 'long' }
-        ];
-
-        // --- APP STATE ---
-        let userState = {
-            isLoggedIn: false,
-            phone: '',
-            origin: LOCATIONS[0],
-            destination: LOCATIONS[1],
-            selectedTier: 'standard',
-            currentPrice: 0,
-            activeRideStatus: 'idle' // idle, searching, in_progress
-        };
-
-        let map, originMarker, destMarker, routePolyline, driverMarker;
-        let activeDriverPos = null;
-
-        // --- INITIALIZATION ---
-        window.onload = function() {
-            updateClock();
-            setInterval(updateClock, 10000);
-            populateLocationDropdowns();
-            initOTPInputs();
-        };
-
-        function updateClock() {
-            const now = new Date();
-            const hours = now.getHours().toString().padStart(2, '0');
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            document.getElementById('clock').innerText = `${hours}:${minutes}`;
-        }
-
-        function populateLocationDropdowns() {
-            const selectOrigin = document.getElementById('selectOrigin');
-            const selectDestination = document.getElementById('selectDestination');
-
-            selectOrigin.innerHTML = '';
-            selectDestination.innerHTML = '';
-
-            LOCATIONS.forEach((loc, index) => {
-                const opt1 = document.createElement('option');
-                opt1.value = loc.id;
-                opt1.text = `📍 Origen: ${loc.name}`;
-                if (index === 0) opt1.selected = true;
-                selectOrigin.appendChild(opt1);
-
-                const opt2 = document.createElement('option');
-                opt2.value = loc.id;
-                opt2.text = `🏁 Destino: ${loc.name}`;
-                if (index === 1) opt2.selected = true;
-                selectDestination.appendChild(opt2);
-            });
-        }
-
-        // --- AUTHENTICATION FLOW ---
-        function sendOTP() {
-            const phone = document.getElementById('inputPhone').value.trim();
-            if (phone.length < 7) {
-                showToast("Ingresa un número telefónico válido");
-                return;
-            }
-            userState.phone = phone;
-            document.getElementById('displayPhone').innerText = `+1 ${phone}`;
-            document.getElementById('stepPhone').classList.add('hidden');
-            document.getElementById('stepOTP').classList.remove('hidden');
-            showToast("Código SMS enviado (1234)");
-        }
-
-        function backToPhone() {
-            document.getElementById('stepOTP').classList.add('hidden');
-            document.getElementById('stepPhone').classList.remove('hidden');
-        }
-
-        function initOTPInputs() {
-            const inputs = document.querySelectorAll('.otp-input');
-            inputs.forEach((input, index) => {
-                input.addEventListener('keyup', (e) => {
-                    if (e.key >= 0 && e.key <= 9) {
-                        if (index < inputs.length - 1) inputs[index + 1].focus();
-                    } else if (e.key === 'Backspace') {
-                        if (index > 0) inputs[index - 1].focus();
-                    }
-                });
-            });
-        }
-
-        function verifyOTP() {
-            userState.isLoggedIn = true;
-            document.getElementById('viewAuth').classList.add('hidden');
-            document.getElementById('viewBooking').classList.remove('hidden');
-            document.getElementById('userBadge').classList.remove('hidden');
-            document.getElementById('profilePhone').innerText = `+1 ${userState.phone || '(732) 555-0199'}`;
+            // Ocultar autenticación y mostrar app principal
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('main-screen').classList.remove('hidden');
             
-            showToast("¡Sesión iniciada con éxito!");
+            // Inicializar mapa de New Brunswick, NJ
             initMap();
         }
 
-        function quickLoginDemo() {
-            document.getElementById('inputPhone').value = '(732) 889-4021';
-            userState.phone = '(732) 889-4021';
-            verifyOTP();
-        }
-
-        function logout() {
-            closeProfileModal();
-            userState.isLoggedIn = false;
-            document.getElementById('viewBooking').classList.add('hidden');
-            document.getElementById('userBadge').classList.add('hidden');
-            document.getElementById('viewAuth').classList.remove('hidden');
-            document.getElementById('stepOTP').classList.add('hidden');
-            document.getElementById('stepPhone').classList.remove('hidden');
-            showToast("Has cerrado sesión");
-        }
-
-        // --- MAP & ROUTING SYSTEM ---
         function initMap() {
-            if (map) return; // Map already initialized
-
-            // Default center: New Brunswick Train Station
-            const center = [40.4962, -74.4452];
-            
-            map = L.map('map', {
-                zoomControl: false
-            }).setView(center, 14);
-
-            // Dark subtle tile layer for stylish modern look
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                maxZoom: 19
+            // Coordenadas de New Brunswick, NJ
+            map = L.map('map').setView([40.4862, -74.4518], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
 
-            updateTripCalculation();
-        }
-
-        function recenterMap() {
-            if (map && userState.origin) {
-                map.flyTo([userState.origin.lat, userState.origin.lng], 14, { animate: true, duration: 1 });
-            }
-        }
-
-        function updateTripCalculation() {
-            const origId = document.getElementById('selectOrigin').value;
-            const destId = document.getElementById('selectDestination').value;
-
-            if (origId === destId) {
-                showToast("El origen y destino no pueden ser el mismo");
-                return;
-            }
-
-            userState.origin = LOCATIONS.find(l => l.id === origId);
-            userState.destination = LOCATIONS.find(l => l.id === destId);
-
-            // Calculate Approximate Haversine Distance (Miles)
-            const distanceMiles = calculateDistance(
-                userState.origin.lat, userState.origin.lng,
-                userState.destination.lat, userState.destination.lng
-            );
-
-            const isLongDistance = (userState.origin.zone === 'long' || userState.destination.zone === 'long' || distanceMiles > 12);
+            // Marcador de ejemplo en New Brunswick
+            L.marker([40.4862, -74.4518]).addTo(map)
+                .bindPopup('<b>Victoria Taxi</b><br>Zona New Brunswick')
+                .openPopup();
             
-            // Dynamic Pricing Logic
-            let baseRate = isLongDistance ? 15.0 : 5.0; // Higher base rate for long trips
-            let perMile = isLongDistance ? 2.20 : 1.80;
+            setTimeout(() => { map.invalidateSize(); }, 500);
+            calculateFare();
+        }
+
+        function selectService(name, rate, element) {
+            currentService = name;
+            currentRate = rate;
+            document.getElementById('selected-service-name').innerText = name;
             
-            let priceStandard = Math.max(8, baseRate + (distanceMiles * perMile));
-            let priceConfort = priceStandard * 1.35;
-            let priceVictory = priceStandard * 1.90;
-
-            // Estimate trip duration (approx 2.5 mins per mile in city, 1.5 on highways)
-            const estMinutes = Math.round(distanceMiles * (isLongDistance ? 1.4 : 2.2) + 3);
-
-            // Update UI elements
-            document.getElementById('tripDistance').innerText = `${distanceMiles.toFixed(1)} miles`;
-            document.getElementById('tripDuration').innerText = `${estMinutes} mins`;
-            document.getElementById('fareTypeLabel').innerText = isLongDistance ? 'Tramo Largo / Highway' : 'Tarifa por Zona Local';
-            document.getElementById('fareTypeLabel').className = isLongDistance ? 
-                'text-[10px] text-amber-400 font-bold px-2 py-0.5 bg-amber-950/60 rounded border border-amber-800' : 
-                'text-[10px] text-zinc-300 font-semibold px-2 py-0.5 bg-zinc-800 rounded';
-
-            document.getElementById('price-standard').innerText = `$${priceStandard.toFixed(2)}`;
-            document.getElementById('price-confort').innerText = `$${priceConfort.toFixed(2)}`;
-            document.getElementById('price-victory').innerText = `$${priceVictory.toFixed(2)}`;
-
-            // Redraw Map Markers & Polyline
-            renderMapElements();
-        }
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 3958.8; // Radius of earth in miles
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
-        }
-
-        function renderMapElements() {
-            if (!map) return;
-
-            // Clear previous layers
-            if (originMarker) map.removeLayer(originMarker);
-            if (destMarker) map.removeLayer(destMarker);
-            if (routePolyline) map.removeLayer(routePolyline);
-
-            // Custom Icon SVGs
-            const greenIcon = L.divIcon({
-                html: `<div class="w-6 h-6 bg-emerald-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold"><i class="fa-solid fa-circle"></i></div>`,
-                className: '',
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
+            document.querySelectorAll('.service-card').forEach(card => {
+                card.classList.remove('border-[#cf2020]', 'bg-zinc-900/80');
+                card.classList.add('border-zinc-800', 'bg-zinc-900/40');
             });
-
-            const redIcon = L.divIcon({
-                html: `<div class="w-6 h-6 bg-brand rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold"><i class="fa-solid fa-flag-checkered"></i></div>`,
-                className: '',
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
-            });
-
-            // Set Markers
-            originMarker = L.marker([userState.origin.lat, userState.origin.lng], { icon: greenIcon }).addTo(map);
-            destMarker = L.marker([userState.destination.lat, userState.destination.lng], { icon: redIcon }).addTo(map);
-
-            // Draw polyline connecting points
-            const latlngs = [
-                [userState.origin.lat, userState.origin.lng],
-                [userState.destination.lat, userState.destination.lng]
-            ];
-
-            routePolyline = L.polyline(latlngs, {
-                color: '#cf2020',
-                weight: 4,
-                opacity: 0.8,
-                dashArray: '8, 8'
-            }).addTo(map);
-
-            // Fit map bounds to show full route
-            map.fitBounds(routePolyline.getBounds(), { padding: [50, 50] });
+            element.classList.remove('border-zinc-800', 'bg-zinc-900/40');
+            element.classList.add('border-[#cf2020]', 'bg-zinc-900/80');
+            calculateFare();
         }
 
-        // --- SERVICE TIER SELECTION ---
-        function selectTier(tier) {
-            userState.selectedTier = tier;
+        function calculateFare() {
+            // Simulación de cálculo por zona y tramos largos en New Brunswick
+            const baseFare = 5.00;
+            const distanceFactor = 4.5; // millas estimadas de recorrido estándar
+            let total = baseFare + (distanceFactor * currentRate);
             
-            // Toggle highlight styles
-            ['standard', 'confort', 'victory'].forEach(t => {
-                const card = document.getElementById(`tier-${t}`);
-                if (t === tier) {
-                    card.classList.add('border-brand');
-                    card.classList.remove('border-transparent');
-                } else {
-                    card.classList.remove('border-brand');
-                    card.classList.add('border-transparent');
-                }
-            });
+            // Actualizar precios visuales
+            document.getElementById('price-standard').innerText = '$' + (5.00 + (4.5 * 1.85)).toFixed(2);
+            document.getElementById('price-confort').innerText = '$' + (8.50 + (4.5 * 2.40)).toFixed(2);
+            document.getElementById('price-victory').innerText = '$' + (14.00 + (4.5 * 3.20)).toFixed(2);
         }
 
-        // --- RIDE REQUEST & DISPATCH SIMULATION ---
-        function requestRide() {
-            userState.activeRideStatus = 'searching';
-            
-            document.getElementById('panelRouteSelect').classList.add('hidden');
-            document.getElementById('panelSearching').classList.remove('hidden');
-
-            // Simulate finding a nearby taxi driver in New Brunswick
-            setTimeout(() => {
-                if (userState.activeRideStatus === 'searching') {
-                    startActiveTrip();
-                }
-            }, 3500);
-        }
-
-        function cancelSearch() {
-            userState.activeRideStatus = 'idle';
-            document.getElementById('panelSearching').classList.add('hidden');
-            document.getElementById('panelRouteSelect').classList.remove('hidden');
-            showToast("Solicitud cancelada");
-        }
-
-        function startActiveTrip() {
-            userState.activeRideStatus = 'in_progress';
-            
-            document.getElementById('panelSearching').classList.add('hidden');
-            document.getElementById('panelTracking').classList.remove('hidden');
-
-            // Assign driver info based on tier
-            if (userState.selectedTier === 'victory') {
-                document.getElementById('driverName').innerText = 'Alexander Wright';
-                document.getElementById('driverCar').innerText = 'Cadillac Escalade Black';
-                document.getElementById('licensePlate').innerText = 'NJ-VIC99';
-            } else if (userState.selectedTier === 'confort') {
-                document.getElementById('driverName').innerText = 'Roberto Gómez';
-                document.getElementById('driverCar').innerText = 'Honda Accord 2023';
-                document.getElementById('licensePlate').innerText = 'NJ-K4521';
-            } else {
-                document.getElementById('driverName').innerText = 'Carlos Mendoza';
-                document.getElementById('driverCar').innerText = 'Toyota Camry Red';
-                document.getElementById('licensePlate').innerText = 'NJ-V789';
-            }
-
-            // Spawn Driver Marker on Map nearby
-            const driverStartLat = userState.origin.lat + 0.005;
-            const driverStartLng = userState.origin.lng + 0.004;
-
-            const carIcon = L.divIcon({
-                html: `<div class="w-8 h-8 bg-black border-2 border-brand text-brand rounded-full flex items-center justify-center shadow-2xl text-xs"><i class="fa-solid fa-taxi"></i></div>`,
-                className: 'car-marker-icon',
-                iconSize: [32, 32],
-                iconAnchor: [16, 16]
-            });
-
-            if (driverMarker) map.removeLayer(driverMarker);
-            driverMarker = L.marker([driverStartLat, driverStartLng], { icon: carIcon }).addTo(map);
-
-            showToast("¡Chofer asignado! En camino a tu ubicación.");
-        }
-
-        function cancelActiveRide() {
-            if (confirm("¿Seguro que deseas cancelar tu viaje con Victoria Taxi?")) {
-                if (driverMarker) map.removeLayer(driverMarker);
-                userState.activeRideStatus = 'idle';
-                document.getElementById('panelTracking').classList.add('hidden');
-                document.getElementById('panelRouteSelect').classList.remove('hidden');
-                showToast("Viaje cancelado");
-            }
-        }
-
-        function simCallDriver() {
-            showToast("Llamando a " + document.getElementById('driverName').innerText + "...");
-        }
-
-        function simMessageDriver() {
-            showToast("Iniciando chat seguro con el chofer...");
-        }
-
-        function togglePaymentMethod() {
-            showToast("Método de pago: Efectivo / Zelle seleccionado");
-        }
-
-        // --- PROFILE MODAL HANDLERS ---
-        function openProfileModal() {
-            document.getElementById('profileModal').classList.remove('hidden');
-        }
-
-        function closeProfileModal() {
-            document.getElementById('profileModal').classList.add('hidden');
-        }
-
-        // --- TOAST NOTIFICATIONS ---
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toastMsg').innerText = msg;
-            toast.classList.remove('-translate-y-20', 'opacity-0');
-            toast.classList.add('translate-y-0', 'opacity-100');
-
-            setTimeout(() => {
-                toast.classList.remove('translate-y-0', 'opacity-100');
-                toast.classList.add('-translate-y-20', 'opacity-0');
-            }, 3000);
+        function requestTaxi() {
+            alert(`¡Buscando tu ${currentService} Taxi en New Brunswick! Un conductor asignado va en camino.`);
         }
     </script>
 </body>
