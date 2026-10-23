@@ -2,29 +2,38 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Victoria Taxi - New Brunswick</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* Desactivar el recargado al deslizar (Pull-to-refresh) */
+        /* Desactivar completamente el Pull-To-Refresh y gestos de recarga */
         html, body {
-            overscroll-behavior: none;
-            overscroll-behavior-y: none;
-            touch-action: manipulation;
-            user-select: none;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden !important;
+            overscroll-behavior: none !important;
+            overscroll-behavior-y: none !important;
+            touch-action: none !important;
             -webkit-user-select: none;
+            user-select: none;
         }
-        
+
+        #main-screen, #auth-screen {
+            touch-action: pan-x pan-y;
+        }
+
         .bg-victoria { background-color: #cf2020; }
         .text-victoria { color: #cf2020; }
         .border-victoria { border-color: #cf2020; }
-        #map { height: 100%; width: 100%; z-index: 10; }
+        #map { height: 100%; width: 100%; z-index: 1; }
     </style>
 </head>
-<body class="bg-black text-white h-screen flex flex-col overflow-hidden">
+<body class="bg-black text-white h-screen flex flex-col">
 
     <!-- 1. PANTALLA DE REGISTRO / AUTENTICACIÓN -->
     <div id="auth-screen" class="fixed inset-0 bg-black z-50 flex flex-col justify-center items-center p-6">
@@ -98,17 +107,12 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        let map, currentService = 'Standard', currentRate = 1.85;
-
-        // Prevenir deslizamiento hacia abajo para recargar la página en móviles
-        document.body.addEventListener('touchmove', function(e) {
-            if (window.scrollY === 0) {
-                // Permite el scroll interno pero bloquea el "pull to refresh" de la ventana principal
-                if (e.touches[0].pageY > 0) {
-                    // Previene recarga
-                }
-            }
+        // Bloqueo total de gestos de arrastre para evitar recargar la página en APK/Webview
+        document.addEventListener('touchmove', function (e) {
+            e.preventDefault();
         }, { passive: false });
+
+        let map, currentService = 'Standard', currentRate = 1.85;
 
         function sendOtp() {
             const phone = document.getElementById('phone-input').value;
@@ -129,13 +133,15 @@
 
         function initMap() {
             // Coordenadas de New Brunswick, NJ
-            map = L.map('map', { zoomControl: false }).setView([40.4862, -74.4518], 14);
+            map = L.map('map', { 
+                zoomControl: false,
+                attributionControl: false
+            }).setView([40.4862, -74.4518], 14);
 
-            // Proveedor de mapa oscuro (CartoDB Dark Matter) - Sin bloqueo 403 y compatible con APKs
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; CartoDB &copy; OpenStreetMap',
-                subdomains: 'abcd',
-                maxZoom: 19
+            // Servidor CDN Esri World Topo / Dark Canvas (Sin bloqueo 403 en APKs)
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Base/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 18,
+                subdomains: ['a', 'b', 'c']
             }).addTo(map);
 
             // Marcador en New Brunswick
@@ -162,9 +168,6 @@
         }
 
         function calculateFare() {
-            const baseFare = 5.00;
-            const distanceFactor = 4.5;
-            
             document.getElementById('price-standard').innerText = '$' + (5.00 + (4.5 * 1.85)).toFixed(2);
             document.getElementById('price-confort').innerText = '$' + (8.50 + (4.5 * 2.40)).toFixed(2);
             document.getElementById('price-victory').innerText = '$' + (14.00 + (4.5 * 3.20)).toFixed(2);
